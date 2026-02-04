@@ -1,5 +1,5 @@
 /**
- * Interactive operations test for MetaMCP
+ * Interactive operations test for MetaMCP (Consolidated Tools)
  * Tests real operations on the Facebook page
  */
 import { GraphApiClient, graphConfig } from "@meta-mcp/core";
@@ -10,7 +10,7 @@ const manager = new FacebookManager(new GraphApiClient(graphConfig), graphConfig
 
 async function testOperations() {
     console.log("╔══════════════════════════════════════════════════════════════╗");
-    console.log("║           MetaMCP Interactive Operations Test                ║");
+    console.log("║     MetaMCP Interactive Operations Test (Consolidated)       ║");
     console.log("╚══════════════════════════════════════════════════════════════╝\n");
 
     // 1. Get page posts with pagination (Testing 'limit' and 'after' schema fields)
@@ -50,22 +50,22 @@ async function testOperations() {
         if (posts.data.length > 0 && posts.data[0]) {
             const postId = posts.data[0].id;
 
-            // 2. Get post insights
-            console.log("📊 2. Fetching post insights...");
+            // 2. Get post insights (consolidated)
+            console.log("📊 2. Fetching post insights (consolidated)...");
             try {
-                const insights = await manager.getPostInsights(postId);
-                console.log("   ✓ Insights retrieved:");
+                const insights = await manager.getInsights(postId);
+                console.log("   ✓ All insights retrieved:");
                 console.log(JSON.stringify(insights, null, 2).split('\n').map(l => '   ' + l).join('\n'));
             } catch (e) {
                 console.log(`   ✗ ${e instanceof Error ? e.message : e}`);
             }
 
-            // 3. Get reactions
-            console.log("\n❤️ 3. Fetching reactions...");
+            // 3. Get specific insights
+            console.log("\n📈 3. Fetching specific insights...");
             try {
-                const likes = await manager.getPostReactionsLikeTotal(postId);
-                console.log("   ✓ Reactions retrieved:");
-                console.log(JSON.stringify(likes, null, 2).split('\n').map(l => '   ' + l).join('\n'));
+                const specific = await manager.getInsights(postId, ["post_reactions_like_total", "post_clicks"]);
+                console.log("   ✓ Specific insights retrieved:");
+                console.log(JSON.stringify(specific, null, 2).split('\n').map(l => '   ' + l).join('\n'));
             } catch (e) {
                 console.log(`   ✗ ${e instanceof Error ? e.message : e}`);
             }

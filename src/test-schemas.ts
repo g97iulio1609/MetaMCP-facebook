@@ -4,10 +4,10 @@ import { zodToJsonSchema } from "zod-to-json-schema";
 import { toolSchemas } from "./toolSchemas.js";
 
 async function runSchemaTest() {
-    console.log("🔍 Inspecting Facebook Tool Schemas...\n");
+    console.log("🔍 Inspecting Consolidated Facebook Tool Schemas...\n");
 
-    // 1. Inspect fb_post_to_facebook Schema
-    const postToolName = "fb_post_to_facebook";
+    // 1. Inspect fb_create_post Schema (consolidated)
+    const postToolName = "fb_create_post";
     const postSchema = toolSchemas[postToolName];
 
     const jsonSchema = zodToJsonSchema(postSchema, {
@@ -21,7 +21,8 @@ async function runSchemaTest() {
     // 2. Test Validation Logic
     console.log("\n🧪 Testing Validation Logic:");
 
-    const validFullInput = {
+    // Test text post
+    const validTextPost = {
         message: "Test post with all fields",
         link: "https://example.com",
         place: "123456789",
@@ -30,25 +31,28 @@ async function runSchemaTest() {
     };
 
     try {
-        const parsed = postSchema.parse(validFullInput);
-        console.log("✅ Valid full input parsed successfully:", parsed);
+        const parsed = postSchema.parse(validTextPost);
+        console.log("✅ Valid text post parsed successfully:", parsed);
     } catch (e) {
         console.error("❌ Failed to parse valid input:", e);
     }
 
-    const validMinimalInput = {
-        message: "Just a message"
+    // Test image post
+    const validImagePost = {
+        image_url: "https://example.com/image.jpg",
+        message: "Image caption"
     };
 
     try {
-        const parsed = postSchema.parse(validMinimalInput);
-        console.log("✅ Valid minimal input parsed successfully:", parsed);
+        const parsed = postSchema.parse(validImagePost);
+        console.log("✅ Valid image post parsed successfully:", parsed);
     } catch (e) {
-        console.error("❌ Failed to parse minimal input:", e);
+        console.error("❌ Failed to parse image post:", e);
     }
 
+    // Test invalid input (missing both message and image_url)
     const invalidInput = {
-        link: "not-a-url" // Missing message, invalid url
+        link: "https://example.com"
     };
 
     try {
@@ -60,6 +64,14 @@ async function runSchemaTest() {
             e.errors.forEach(err => console.log(`   - ${err.path.join(".")}: ${err.message}`));
         }
     }
+
+    // 3. Inspect fb_get_insights schema
+    console.log("\n📋 JSON Schema for 'fb_get_insights':");
+    const insightsSchema = zodToJsonSchema(toolSchemas.fb_get_insights, {
+        name: "fb_get_insights",
+        $refStrategy: "none",
+    });
+    console.log(JSON.stringify(insightsSchema, null, 2));
 }
 
 runSchemaTest();

@@ -3,23 +3,15 @@ import type {
   FacebookComment,
   FacebookPost,
   GraphApiCollection,
-  PostLikeSummary,
   PostShareCount,
 } from "@meta-mcp/core";
 
-const NEGATIVE_KEYWORDS = [
-  "bad",
-  "terrible",
-  "awful",
-  "hate",
-  "dislike",
-  "problem",
-  "issue",
-  "scam",
-  "refund",
-  "broken",
-];
-
+/**
+ * Facebook Graph API Manager
+ * 
+ * Provides methods for interacting with Facebook Page APIs.
+ * Methods are organized to support consolidated MCP tools.
+ */
 export class FacebookManager {
   private readonly client: GraphApiClient;
   private readonly pageId: string;
@@ -32,6 +24,10 @@ export class FacebookManager {
   static fromEnv(): FacebookManager {
     return new FacebookManager(new GraphApiClient(graphConfig), graphConfig.pageId);
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Post Operations
+  // ─────────────────────────────────────────────────────────────────────────
 
   async postToFacebook(message: string, options: {
     link?: string;
@@ -49,35 +45,19 @@ export class FacebookManager {
     });
   }
 
-  async replyToComment(commentId: string, message: string): Promise<Record<string, unknown>> {
+  async postImageToFacebook(imageUrl: string, caption: string): Promise<Record<string, unknown>> {
     return this.client.request({
       method: "POST",
-      endpoint: `${commentId}/comments`,
+      endpoint: `${this.pageId}/photos`,
+      params: { url: imageUrl, caption },
+    });
+  }
+
+  async updatePost(postId: string, message: string): Promise<Record<string, unknown>> {
+    return this.client.request({
+      method: "POST",
+      endpoint: postId,
       params: { message },
-    });
-  }
-
-  async getPagePosts(limit = 25, after?: string): Promise<GraphApiCollection<FacebookPost>> {
-    return this.client.request({
-      method: "GET",
-      endpoint: `${this.pageId}/posts`,
-      params: {
-        fields: "id,message,created_time",
-        limit,
-        after,
-      },
-    });
-  }
-
-  async getPostComments(postId: string, limit = 25, after?: string): Promise<GraphApiCollection<FacebookComment>> {
-    return this.client.request({
-      method: "GET",
-      endpoint: `${postId}/comments`,
-      params: {
-        fields: "id,message,from,created_time",
-        limit,
-        after,
-      },
     });
   }
 
@@ -88,6 +68,48 @@ export class FacebookManager {
     });
   }
 
+  async getPagePosts(
+    limit = 25, 
+    after?: string,
+    fields = "id,message,created_time"
+  ): Promise<GraphApiCollection<FacebookPost>> {
+    return this.client.request({
+      method: "GET",
+      endpoint: `${this.pageId}/posts`,
+      params: { fields, limit, after },
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Comment Operations
+  // ─────────────────────────────────────────────────────────────────────────
+
+  async getPostComments(
+    postId: string, 
+    limit = 25, 
+    after?: string,
+    includeSummary = false
+  ): Promise<GraphApiCollection<FacebookComment> & { summary?: { total_count: number } }> {
+    return this.client.request({
+      method: "GET",
+      endpoint: `${postId}/comments`,
+      params: {
+        fields: "id,message,from,created_time",
+        limit,
+        after,
+        summary: includeSummary ? "true" : undefined,
+      },
+    });
+  }
+
+  async replyToComment(commentId: string, message: string): Promise<Record<string, unknown>> {
+    return this.client.request({
+      method: "POST",
+      endpoint: `${commentId}/comments`,
+      params: { message },
+    });
+  }
+
   async deleteComment(commentId: string): Promise<Record<string, unknown>> {
     return this.client.request({
       method: "DELETE",
@@ -95,114 +117,60 @@ export class FacebookManager {
     });
   }
 
-  filterNegativeComments(comments: GraphApiCollection<FacebookComment>) {
-    return (comments.data ?? []).filter((comment) => {
-      const text = comment.message?.toLowerCase();
-      if (!text) return false;
-      for (const keyword of NEGATIVE_KEYWORDS) {
-        if (text.includes(keyword)) {
-          return true;
-        }
-      }
-      return false;
-    });
-  }
-
-  async getNumberOfComments(postId: string): Promise<number> {
-    const response = await this.getPostComments(postId);
-    return response.data.length;
-  }
-
-  async getNumberOfLikes(postId: string): Promise<number> {
-    const response = await this.client.request<PostLikeSummary>({
-      method: "GET",
-      endpoint: postId,
-      params: { fields: "likes.summary(true)" },
-    });
-
-    return response.likes?.summary?.total_count ?? 0;
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Insights & Analytics
+  // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Get all post insights.
-   * Note: Many metrics were deprecated in v24.0 (March 2024).
-   * Only valid metrics are requested to avoid API errors.
+   * Default metrics available in Graph API v24.0+
    */
-  async getPostInsights(postId: string): Promise<Record<string, unknown>> {
-    // Use only v24.0 valid metrics - others were deprecated
-    return this.getInsights(postId, [
-      "post_impressions_unique",
-      "post_clicks",
-      "post_reactions_like_total",
-      "post_reactions_love_total",
-      "post_reactions_wow_total",
-      "post_reactions_haha_total",
-      "post_reactions_sorry_total",
-      "post_reactions_anger_total",
-    ]);
-  }
+  private static readonly DEFAULT_METRICS = [
+    "post_impressions_unique",
+    "post_clicks",
+    "post_reactions_like_total",
+    "post_reactions_love_total",
+    "post_reactions_wow_total",
+    "post_reactions_haha_total",
+    "post_reactions_sorry_total",
+    "post_reactions_anger_total",
+  ] as const;
 
   /**
-   * Get unique impressions of a post.
-   * This is the only non-deprecated impression metric in v24.0.
+   * Get post insights.
+   * @param postId - Post ID
+   * @param metrics - Specific metrics to fetch (optional, defaults to all available)
    */
-  async getPostImpressionsUnique(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_impressions_unique"]);
-  }
-
-  /**
-   * Get post clicks.
-   */
-  async getPostClicks(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_clicks"]);
-  }
-
-  async getPostReactionsLikeTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_like_total"]);
-  }
-
-  async getPostReactionsLoveTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_love_total"]);
-  }
-
-  async getPostReactionsWowTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_wow_total"]);
-  }
-
-  async getPostReactionsHahaTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_haha_total"]);
-  }
-
-  async getPostReactionsSorryTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_sorry_total"]);
-  }
-
-  async getPostReactionsAngerTotal(postId: string): Promise<Record<string, unknown>> {
-    return this.getInsights(postId, ["post_reactions_anger_total"]);
-  }
-
-  async getPostTopCommenters(postId: string) {
-    const comments = await this.getPostComments(postId);
-    const counter = new Map<string, number>();
-
-    for (const comment of comments.data ?? []) {
-      const userId = comment.from?.id;
-      if (!userId) continue;
-      counter.set(userId, (counter.get(userId) ?? 0) + 1);
-    }
-
-    return [...counter.entries()]
-      .map(([userId, count]) => ({ user_id: userId, count }))
-      .sort((a, b) => b.count - a.count);
-  }
-
-  async postImageToFacebook(imageUrl: string, caption: string): Promise<Record<string, unknown>> {
+  async getInsights(postId: string, metrics?: string[]): Promise<Record<string, unknown>> {
+    const metricsToFetch = metrics?.length ? metrics : FacebookManager.DEFAULT_METRICS;
     return this.client.request({
-      method: "POST",
-      endpoint: `${this.pageId}/photos`,
-      params: { url: imageUrl, caption },
+      method: "GET",
+      endpoint: `${postId}/insights`,
+      params: {
+        metric: metricsToFetch.join(","),
+        period: "lifetime",
+      },
     });
   }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Page Information
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Get page information.
+   * @param fields - Comma-separated fields to return (default: id,name,fan_count)
+   */
+  async getPageInfo(fields = "id,name,fan_count"): Promise<Record<string, unknown>> {
+    return this.client.request({
+      method: "GET",
+      endpoint: this.pageId,
+      params: { fields },
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Messaging
+  // ─────────────────────────────────────────────────────────────────────────
 
   async sendDmToUser(userId: string, message: string): Promise<Record<string, unknown>> {
     return this.client.request({
@@ -216,45 +184,9 @@ export class FacebookManager {
     });
   }
 
-  async updatePost(postId: string, newMessage: string): Promise<Record<string, unknown>> {
-    return this.client.request({
-      method: "POST",
-      endpoint: postId,
-      params: { message: newMessage },
-    });
-  }
-
-  async schedulePost(message: string, publishTime: number): Promise<Record<string, unknown>> {
-    return this.client.request({
-      method: "POST",
-      endpoint: `${this.pageId}/feed`,
-      params: {
-        message,
-        published: false,
-        scheduled_publish_time: publishTime,
-      },
-    });
-  }
-
-  async getPageFanCount(): Promise<number> {
-    const response = await this.client.request<{ fan_count?: number }>({
-      method: "GET",
-      endpoint: this.pageId,
-      params: { fields: "fan_count" },
-    });
-
-    return response.fan_count ?? 0;
-  }
-
-  async getPostShareCount(postId: string): Promise<number> {
-    const response = await this.client.request<PostShareCount>({
-      method: "GET",
-      endpoint: postId,
-      params: { fields: "shares" },
-    });
-
-    return response.shares?.count ?? 0;
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // Batch Operations
+  // ─────────────────────────────────────────────────────────────────────────
 
   async batchRequest(operations: BatchOperation[], includeHeaders = false) {
     return this.client.request({
@@ -269,17 +201,6 @@ export class FacebookManager {
           omit_response_on_success: operation.omit_response_on_success,
         }))),
         include_headers: includeHeaders,
-      },
-    });
-  }
-
-  private async getInsights(postId: string, metrics: string[]) {
-    return this.client.request({
-      method: "GET",
-      endpoint: `${postId}/insights`,
-      params: {
-        metric: metrics.join(","),
-        period: "lifetime",
       },
     });
   }

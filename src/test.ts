@@ -1,6 +1,6 @@
 /**
  * Comprehensive test suite for MetaMCP (v24.0 compliant)
- * Tests all valid Facebook Graph API tools
+ * Tests all consolidated Facebook Graph API tools
  */
 import { GraphApiClient, graphConfig } from "@meta-mcp/core";
 import { FacebookManager } from "./manager";
@@ -56,7 +56,7 @@ class TestRunner {
 
     async runAllTests(): Promise<void> {
         console.log("╔══════════════════════════════════════════════════════════════╗");
-        console.log("║              MetaMCP Test Suite (v24.0)                      ║");
+        console.log("║        MetaMCP Test Suite (Consolidated Tools v24.0)         ║");
         console.log("╠══════════════════════════════════════════════════════════════╣");
         console.log(`║ Page ID: ${graphConfig.pageId.padEnd(51)}║`);
         console.log("╚══════════════════════════════════════════════════════════════╝\n");
@@ -65,14 +65,14 @@ class TestRunner {
         console.log("📄 PAGE TESTS");
         console.log("─".repeat(64));
 
-        await this.runTest("fb_get_page_fan_count", async () => {
-            const count = await this.manager.getPageFanCount();
-            console.log(`   ✓ fb_get_page_fan_count - ${count} fans`);
+        await this.runTest("fb_get_page_info", async () => {
+            const info = await this.manager.getPageInfo();
+            console.log(`   ✓ fb_get_page_info - retrieved page info`);
         });
 
-        await this.runTest("fb_get_page_posts", async () => {
+        await this.runTest("fb_get_posts", async () => {
             const posts = await this.manager.getPagePosts();
-            console.log(`   ✓ fb_get_page_posts - ${posts.data.length} posts`);
+            console.log(`   ✓ fb_get_posts - ${posts.data.length} posts`);
             if (posts.data.length > 0 && posts.data[0]) {
                 this.existingPostId = posts.data[0].id;
             }
@@ -84,72 +84,32 @@ class TestRunner {
             return;
         }
 
-        // POST METRICS
-        console.log("\n📊 POST METRICS");
+        // INSIGHTS (consolidated)
+        console.log("\n📈 INSIGHTS (consolidated)");
         console.log("─".repeat(64));
 
-        await this.runTest("fb_get_post_share_count", async () => {
-            const shares = await this.manager.getPostShareCount(this.existingPostId!);
-            console.log(`   ✓ fb_get_post_share_count - ${shares} shares`);
+        await this.runTest("fb_get_insights (all)", async () => {
+            await this.manager.getInsights(this.existingPostId!);
+            console.log(`   ✓ fb_get_insights - all metrics retrieved`);
         });
 
-        await this.runTest("fb_get_number_of_likes", async () => {
-            const likes = await this.manager.getNumberOfLikes(this.existingPostId!);
-            console.log(`   ✓ fb_get_number_of_likes - ${likes} likes`);
+        await this.runTest("fb_get_insights (specific)", async () => {
+            await this.manager.getInsights(this.existingPostId!, ["post_impressions_unique", "post_clicks"]);
+            console.log(`   ✓ fb_get_insights - specific metrics retrieved`);
         });
 
-        await this.runTest("fb_get_number_of_comments", async () => {
-            const count = await this.manager.getNumberOfComments(this.existingPostId!);
-            console.log(`   ✓ fb_get_number_of_comments - ${count} comments`);
-        });
-
-        // INSIGHTS (v24.0 valid metrics only)
-        console.log("\n📈 INSIGHTS (v24.0 metrics)");
+        // COMMENTS
+        console.log("\n💬 COMMENTS");
         console.log("─".repeat(64));
 
-        await this.runTest("fb_get_post_insights", async () => {
-            await this.manager.getPostInsights(this.existingPostId!);
-            console.log(`   ✓ fb_get_post_insights - retrieved`);
+        await this.runTest("fb_get_comments", async () => {
+            const comments = await this.manager.getPostComments(this.existingPostId!);
+            console.log(`   ✓ fb_get_comments - ${comments.data.length} comments`);
         });
 
-        await this.runTest("fb_get_post_impressions_unique", async () => {
-            await this.manager.getPostImpressionsUnique(this.existingPostId!);
-            console.log(`   ✓ fb_get_post_impressions_unique - retrieved`);
-        });
-
-        await this.runTest("fb_get_post_clicks", async () => {
-            await this.manager.getPostClicks(this.existingPostId!);
-            console.log(`   ✓ fb_get_post_clicks - retrieved`);
-        });
-
-        // REACTIONS
-        console.log("\n❤️ REACTIONS");
-        console.log("─".repeat(64));
-
-        const reactionMethods = [
-            { name: "fb_get_post_reactions_like_total", fn: () => this.manager.getPostReactionsLikeTotal(this.existingPostId!) },
-            { name: "fb_get_post_reactions_love_total", fn: () => this.manager.getPostReactionsLoveTotal(this.existingPostId!) },
-            { name: "fb_get_post_reactions_wow_total", fn: () => this.manager.getPostReactionsWowTotal(this.existingPostId!) },
-            { name: "fb_get_post_reactions_haha_total", fn: () => this.manager.getPostReactionsHahaTotal(this.existingPostId!) },
-            { name: "fb_get_post_reactions_sorry_total", fn: () => this.manager.getPostReactionsSorryTotal(this.existingPostId!) },
-            { name: "fb_get_post_reactions_anger_total", fn: () => this.manager.getPostReactionsAngerTotal(this.existingPostId!) },
-        ];
-
-        for (const { name, fn } of reactionMethods) {
-            await this.runTest(name, async () => {
-                await fn();
-                console.log(`   ✓ ${name}`);
-            });
-        }
-
-        // UTILITY
-        console.log("\n🔧 UTILITIES");
-        console.log("─".repeat(64));
-
-        await this.runTest("fb_filter_negative_comments", async () => {
-            const mockComments = { data: [{ id: "1", message: "terrible" }] };
-            const filtered = this.manager.filterNegativeComments(mockComments);
-            console.log(`   ✓ fb_filter_negative_comments - ${filtered.length} flagged`);
+        await this.runTest("fb_get_comments (with summary)", async () => {
+            const comments = await this.manager.getPostComments(this.existingPostId!, 10, undefined, true);
+            console.log(`   ✓ fb_get_comments (summary) - retrieved`);
         });
 
         this.printSummary();
