@@ -25,12 +25,12 @@ export const createToolRegistry = (manager: FacebookManager): ToolRegistry<ToolN
     // Create post (text, image, link, scheduled)
     fb_create_post: async (args) => {
       const parsed = parseToolArgs(toolSchemas.fb_create_post, args);
-      
+
       // Image post
       if (parsed.image_url) {
         return manager.postImageToFacebook(parsed.image_url, parsed.message ?? "");
       }
-      
+
       // Text/link post (optionally scheduled)
       return manager.postToFacebook(parsed.message!, {
         link: parsed.link,
@@ -38,6 +38,24 @@ export const createToolRegistry = (manager: FacebookManager): ToolRegistry<ToolN
         published: parsed.published,
         scheduled_publish_time: parsed.scheduled_publish_time,
       });
+    },
+
+    // Post Photo
+    fb_post_photo: async (args) => {
+      const parsed = parseToolArgs(toolSchemas.fb_post_photo, args);
+      return manager.postImageToFacebook(parsed.url, parsed.caption ?? "");
+    },
+
+    // Post Video
+    fb_post_video: async (args) => {
+      const parsed = parseToolArgs(toolSchemas.fb_post_video, args);
+      return manager.postVideoToFacebook(parsed.file_url, parsed.description, parsed.title);
+    },
+
+    // Post Reel
+    fb_post_reel: async (args) => {
+      const parsed = parseToolArgs(toolSchemas.fb_post_reel, args);
+      return manager.postReelToFacebook(parsed.video_url, parsed.caption);
     },
 
     // Update post

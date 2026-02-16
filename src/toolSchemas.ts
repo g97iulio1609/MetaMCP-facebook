@@ -37,7 +37,7 @@ const insightMetricSchema = z.enum([
   "post_impressions_unique",
   "post_clicks",
   "post_reactions_like_total",
-  "post_reactions_love_total", 
+  "post_reactions_love_total",
   "post_reactions_wow_total",
   "post_reactions_haha_total",
   "post_reactions_sorry_total",
@@ -61,9 +61,26 @@ export const toolSchemas = {
     published: z.boolean().optional().default(true).describe("Publish immediately (true) or draft/schedule (false)"),
     scheduled_publish_time: z.number().int().optional().describe("Unix timestamp for scheduling (requires published: false)"),
   }).refine(
-    (data) => data.message || data.image_url,
-    { message: "Either message or image_url is required" }
+    (data) => data.message || data.image_url || data.link,
+    { message: "Either message, image_url, or link is required" }
   ),
+
+  fb_post_photo: z.object({
+    url: z.string().url().describe("The URL of the photo to publish"),
+    caption: z.string().optional().describe("The caption for the photo"),
+    published: z.boolean().optional().default(true).describe("Publish immediately (true) or draft (false)"),
+  }),
+
+  fb_post_video: z.object({
+    file_url: z.string().url().describe("The URL of the video to publish"),
+    description: z.string().optional().describe("The description/caption for the video"),
+    title: z.string().optional().describe("Video title"),
+  }),
+
+  fb_post_reel: z.object({
+    video_url: z.string().url().describe("The URL of the video for the reel"),
+    caption: z.string().optional().describe("Caption for the reel"),
+  }),
 
   /**
    * Update an existing post
@@ -151,6 +168,9 @@ export const toolSchemas = {
 
 export const toolDescriptions: Record<ToolName, string> = {
   fb_create_post: "Create a Facebook post (text, image, link, or scheduled). Supports immediate publishing or scheduling.",
+  fb_post_photo: "Publish a photo to the Facebook Page.",
+  fb_post_video: "Publish a video to the Facebook Page.",
+  fb_post_reel: "Publish a Reel to the Facebook Page.",
   fb_update_post: "Update an existing post's message.",
   fb_delete_post: "Delete a post from the Facebook Page.",
   fb_get_posts: "Get page posts with pagination. Use 'after' cursor for next page.",

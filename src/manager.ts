@@ -53,6 +53,50 @@ export class FacebookManager {
     });
   }
 
+  async postVideoToFacebook(videoUrl: string, description?: string, title?: string): Promise<Record<string, unknown>> {
+    const params: Record<string, string | boolean> = {
+      file_url: videoUrl,
+    };
+    if (description) params.description = description;
+    if (title) params.title = title;
+
+    return this.client.request({
+      method: "POST",
+      endpoint: `${this.pageId}/videos`,
+      params,
+    });
+  }
+
+  async postReelToFacebook(videoUrl: string, caption?: string): Promise<Record<string, unknown>> {
+    // Reels on FB Pages are essentially videos with specific flags or endpoints.
+    // However, the dedicated 'video_reels' endpoint is often for initial upload + publish flow.
+    // For simplicity and consistency with IG, we'll use the video endpoint but we might need 
+    // to verify if specific flags are needed for "Reel" format or if it auto-detects.
+    // According to recent Graph API, standard video upload can be used, but let's Try the specific Reel flow if available.
+    // Actually, `video_reels` endpoint is for creating a reel draft then publishing.
+
+    // Step 1: Initialize Reel Upload
+    const initResponse = await this.client.request<{ video_id: string; upload_url: string }>({
+      method: "POST",
+      endpoint: `${this.pageId}/video_reels`,
+      params: {
+        upload_phase: 'start',
+      }
+    });
+
+    if (!initResponse.video_id) {
+      throw new Error("Failed to initialize Reel upload");
+    }
+
+    // Since we are strictly using URL-based upload in this tool for simplicity (no binary stream from client),
+    // we might be limited. The `video_reels` endpoint typically expects binary upload to the `upload_url`.
+    // Valid alternative: Use standard `/videos` endpoint which accepts `file_url`, and the content will be treated as a video.
+    // To explicitly be a "Reel", it usually needs to be short and 9:16.
+    // Let's stick to the /videos endpoint with `file_url` for now as it's most robust for URL-based flows without a server-side file proxy.
+
+    return this.postVideoToFacebook(videoUrl, caption, "Reel");
+  }
+
   async updatePost(postId: string, message: string): Promise<Record<string, unknown>> {
     return this.client.request({
       method: "POST",
@@ -69,7 +113,7 @@ export class FacebookManager {
   }
 
   async getPagePosts(
-    limit = 25, 
+    limit = 25,
     after?: string,
     fields = "id,message,created_time"
   ): Promise<GraphApiCollection<FacebookPost>> {
@@ -85,8 +129,8 @@ export class FacebookManager {
   // ─────────────────────────────────────────────────────────────────────────
 
   async getPostComments(
-    postId: string, 
-    limit = 25, 
+    postId: string,
+    limit = 25,
     after?: string,
     includeSummary = false
   ): Promise<GraphApiCollection<FacebookComment> & { summary?: { total_count: number } }> {
